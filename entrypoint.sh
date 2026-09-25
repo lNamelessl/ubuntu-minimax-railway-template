@@ -68,8 +68,12 @@ provider_configured() {
 }
 
 provider_key_stale() {
+    # Extract the apiKey line from THIS provider's block only (config.yaml may
+    # hold several custom providers; the value is stored resolved, not by name).
     local stored
-    stored="$(grep -m1 'apiKey:' /home/dev/.minimax/config.yaml 2>/dev/null | awk '{print $2}')"
+    stored="$(sed -n "/^  ${MCODE_PROVIDER_NAME}:/,/^  [a-zA-Z0-9_-]*:/p" \
+        /home/dev/.minimax/config.yaml 2>/dev/null \
+        | grep -m1 'apiKey:' | awk '{print $2}')"
     [ -n "$stored" ] && [ "$stored" != "$MCODE_PROVIDER_API_KEY" ]
 }
 
@@ -83,9 +87,13 @@ provider_add_args() {
 }
 
 provider_install() {
-    # $1 = extra args (e.g. --use for tested save+select)
+    # $1 = extra args (e.g. --use for tested save+select).
+    # mcode 0.5.4 wants the full "custom_provider:<id>" form and --yes for
+    # non-interactive removal.
     runuser -u dev -- /usr/bin/env HOME=/home/dev \
-        /usr/bin/mcode provider remove "$MCODE_PROVIDER_NAME" >/dev/null 2>&1 || true
+        /usr/bin/mcode provider remove "custom_provider:${MCODE_PROVIDER_NAME}" --yes >/dev/null 2>&1 || true
+    runuser -u dev -- /usr/bin/env HOME=/home/dev \
+        /usr/bin/mcode provider remove "${MCODE_PROVIDER_NAME}" --yes >/dev/null 2>&1 || true
     # shellcheck disable=SC2046
     runuser -u dev -- /usr/bin/env HOME=/home/dev \
         /usr/bin/mcode provider add $(provider_add_args) "$@"
