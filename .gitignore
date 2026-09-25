@@ -3,3 +3,5 @@ test-keys/
 .env
 gql.mjs
 tmp/
+mock-server.py
+mock-req.log

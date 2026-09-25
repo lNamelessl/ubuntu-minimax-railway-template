@@ -29,17 +29,17 @@ First thing inside, sanity-check the agent:
 
 ```bash
 mcode --version
-mcode exec "write hello.py that prints hello world, then run it"
+mcode exec --permission full "write hello.py that prints hello world, then run it"
 ```
 
-Headless `mcode exec` is perfect for scripts/CI; plain `mcode` opens the interactive TUI.
+Headless `mcode exec` is perfect for scripts/CI — pass `--permission full` (or `off`) since a headless run cannot answer interactive permission prompts; plain `mcode` opens the interactive TUI.
 
 ## Variables
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `SSH_PUBLIC_KEY` | for SSH access | empty | Public key(s), one per line, installed into `/home/dev/.ssh/authorized_keys` at boot. Password auth is disabled. |
-| `MCODE_PROVIDER_API_KEY` | for agent use | empty | Your MiniMax subscription key. Present at boot -> provider `mm` is configured and activated automatically. Config stores the env-var *name*, so rotating the key needs no re-config — just change the variable. |
+| `MCODE_PROVIDER_API_KEY` | for agent use | empty | Your MiniMax subscription key. Present at boot -> provider `mm` is configured and activated automatically (boot tests the key; if the live test fails the config is still saved so it works the moment a valid key is in place). Changing the variable and restarting re-provisions the provider with the new value. |
 | `MCODE_MODEL` | no | `MiniMax-M3` | Model passed to the provider config. Alternatives: `MiniMax-M2.7`, `MiniMax-M2.5`, `MiniMax-M2.1`, `MiniMax-M2` (see [MiniMax models](https://platform.minimax.io/docs/guides/text-generation)). |
 | `MCODE_PROVIDER_NAME` | no | `mm` | Name of the auto-created provider profile. |
 | `MCODE_BASE_URL` | no | `https://api.minimax.io/anthropic` | Any Anthropic-compatible endpoint works (`anthropic-messages` format). Point it at a relay/self-hosted gateway if you like. |
@@ -78,7 +78,7 @@ Workstation: roughly **$5–10/month** on Railway (service + 5 GB volume, scales
 
 - **`Permission denied (publickey)`** — `SSH_PUBLIC_KEY` missing/wrong, or the service wasn't restarted after setting it. The key must be the *public* key line. Fingerprint shows in deploy logs at boot. Only the `dev` user is admitted; root login is refused.
 - **`mcode: command not found` / wrong Node** — the image pins Node 22 and mcode 0.5.4; check `/healthz` shows the mcode version, and `mcode --version` inside the box.
-- **Agent auth errors in `mcode`** — the provider wasn't configured: confirm `MCODE_PROVIDER_API_KEY` is set and restart, or run the `mcode provider add ...` command above interactively; check `mcode provider list` / `mcode provider test mm`.
+- **Agent auth errors in `mcode`** — the provider wasn't configured or the key is stale: confirm `MCODE_PROVIDER_API_KEY` is set and restart (boot re-provisions on key change), or run the `mcode provider add ...` command above interactively; check `mcode provider list` / `mcode provider test mm`.
 - **Model not found / 404 from the API** — update `MCODE_MODEL` (MiniMax rotates model names; delete `~/.minimax/config.yaml` provider block or re-run `mcode provider add` with the new name after changing the variable).
 - **Files vanished after redeploy** — make sure the volume is still attached to the service at `/home/dev`; data outside `/home/dev` (e.g. `/root`, `/tmp`) is ephemeral.
 - **SSH connection drops** — keepalives are on (60s); long-running work belongs in `tmux`/`screen` (install with `sudo apt install tmux`).

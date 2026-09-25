@@ -59,42 +59,63 @@ chown dev:dev /home/dev/.ssh /home/dev/.ssh/authorized_keys
 chmod 600 /etc/environment
 
 # --- 5. BYOK bootstrap (idempotent) -------------------------------------------
-# The provider config stores the *name* of the env var (--api-key-env), not the
-# key itself, so rotating MCODE_PROVIDER_API_KEY needs no config change.
+# NOTE: mcode stores the resolved key VALUE in ~/.minimax/config.yaml (not the
+# env-var name), so when MCODE_PROVIDER_API_KEY changes we re-provision the
+# provider to keep the stored key in sync with the environment.
 provider_configured() {
     [ -f /home/dev/.minimax/config.yaml ] \
         && grep -q "name: ${MCODE_PROVIDER_NAME}\b" /home/dev/.minimax/config.yaml
 }
 
+provider_key_stale() {
+    local stored
+    stored="$(grep -m1 'apiKey:' /home/dev/.minimax/config.yaml 2>/dev/null | awk '{print $2}')"
+    [ -n "$stored" ] && [ "$stored" != "$MCODE_PROVIDER_API_KEY" ]
+}
+
+provider_add_args() {
+    printf '%s\n' \
+        --name "$MCODE_PROVIDER_NAME" \
+        --base-url "$MCODE_BASE_URL" \
+        --api-format anthropic-messages \
+        --model "$MCODE_MODEL" \
+        --api-key-env MCODE_PROVIDER_API_KEY
+}
+
+provider_install() {
+    # $1 = extra args (e.g. --use for tested save+select)
+    runuser -u dev -- /usr/bin/env HOME=/home/dev \
+        /usr/bin/mcode provider remove "$MCODE_PROVIDER_NAME" >/dev/null 2>&1 || true
+    # shellcheck disable=SC2046
+    runuser -u dev -- /usr/bin/env HOME=/home/dev \
+        /usr/bin/mcode provider add $(provider_add_args) "$@"
+}
+
+provider_activate_fallback() {
+    # Replicates what --use does on success (mcode <=0.5.4 has no non-testing
+    # select command): point defaultModel at the custom provider.
+    sed -i "s|^defaultModel:.*|defaultModel: custom_provider:${MCODE_PROVIDER_NAME}/${MCODE_MODEL}|" \
+        /home/dev/.minimax/config.yaml
+}
+
 if [ -n "${MCODE_PROVIDER_API_KEY:-}" ]; then
-    if provider_configured; then
+    if provider_configured && ! provider_key_stale; then
         log "mcode provider '${MCODE_PROVIDER_NAME}' already configured — skipping"
     else
-        log "configuring mcode provider '${MCODE_PROVIDER_NAME}' -> ${MCODE_BASE_URL} (${MCODE_MODEL})"
+        if provider_configured && provider_key_stale; then
+            log "MCODE_PROVIDER_API_KEY changed — re-provisioning provider '${MCODE_PROVIDER_NAME}'"
+        else
+            log "configuring mcode provider '${MCODE_PROVIDER_NAME}' -> ${MCODE_BASE_URL} (${MCODE_MODEL})"
+        fi
         # Preferred: test the key live, then save + select.
-        if runuser -u dev -- /usr/bin/env HOME=/home/dev \
-            /usr/bin/mcode provider add \
-                --name "$MCODE_PROVIDER_NAME" \
-                --base-url "$MCODE_BASE_URL" \
-                --api-format anthropic-messages \
-                --model "$MCODE_MODEL" \
-                --api-key-env MCODE_PROVIDER_API_KEY \
-                --use; then
+        if provider_install --use; then
             log "provider configured and set active (connection test passed)"
         else
             # Key present but the live test failed (placeholder/rotated key).
             # Save the config unvalidated and select it — it will start working
             # as soon as a valid key is supplied via the env variable.
             log "connection test failed — saving provider config unvalidated and selecting it"
-            if runuser -u dev -- /usr/bin/env HOME=/home/dev \
-                /usr/bin/mcode provider add \
-                    --name "$MCODE_PROVIDER_NAME" \
-                    --base-url "$MCODE_BASE_URL" \
-                    --api-format anthropic-messages \
-                    --model "$MCODE_MODEL" \
-                    --api-key-env MCODE_PROVIDER_API_KEY \
-                && runuser -u dev -- /usr/bin/env HOME=/home/dev \
-                /usr/bin/mcode provider use "$MCODE_PROVIDER_NAME"; then
+            if provider_install && provider_activate_fallback; then
                 log "provider saved and set active (untested — check the API key)"
             else
                 log "WARN: mcode provider add failed (exit $?) — agent still installed;"
