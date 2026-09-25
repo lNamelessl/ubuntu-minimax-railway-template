@@ -1,0 +1,12 @@
+  Ubuntu + MiniMax Code workstation
+  =================================
+  Agent:    mcode (MiniMax Code CLI) -> https://github.com/MiniMax-AI/minimax-code
+  Projects: ~/projects
+  Provider: configured at boot from MCODE_PROVIDER_API_KEY (provider "mm"),
+            or set it up now:
+              mcode provider add --name mm \
+                --base-url https://api.minimax.io/anthropic \
+                --api-format anthropic-messages --model MiniMax-M3 \
+                --api-key-env MCODE_PROVIDER_API_KEY --use
+  Try it:   mcode exec "write hello.py that prints hello world, then run it"
+  Docs:     mcode --help  |  https://agent.minimax.io/docs/cli/quick-start
