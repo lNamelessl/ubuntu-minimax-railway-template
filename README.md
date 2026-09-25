@@ -1,6 +1,10 @@
 # Ubuntu + MiniMax Code — SSH Coding Workstation (Railway Template)
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/ubuntu-minimax-template)
+
 One-click Railway template for a **persistent Ubuntu 24.04 SSH workstation with MiniMax's `mcode` coding agent preinstalled** — bring your own MiniMax API key, SSH in from anywhere, and put the agent to work.
+
+**Deploy:** https://railway.com/deploy/ubuntu-minimax-template (when prompted for `PORT`, enter `8000`)
 
 - **Ubuntu 24.04** (glibc — required by mcode; no Alpine/musl) + **OpenSSH**, key-only auth
 - **mcode** (MiniMax Code CLI, `@minimax-ai/code`, MIT) pinned at `0.5.4`, Node.js 22.x (mcode requires 22.19+)
