@@ -48,7 +48,9 @@ RUN npm install -g "@minimax-ai/code@${MCODE_VERSION}" \
     && mcode --version
 
 # Non-root dev user (uid 1000) with passwordless sudo (single-user workstation).
-RUN useradd -m -s /bin/bash -u 1000 dev \
+# ubuntu:24.04 ships a placeholder "ubuntu" user with UID 1000 — remove it first.
+RUN userdel -r ubuntu 2>/dev/null || true \
+    && useradd -m -s /bin/bash -u 1000 dev \
     && echo "dev ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/dev \
     && chmod 0440 /etc/sudoers.d/dev \
     && mkdir -p /home/dev/projects /home/dev/.ssh \

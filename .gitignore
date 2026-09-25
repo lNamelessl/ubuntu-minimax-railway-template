@@ -1,3 +1,5 @@
 test-keys/
 *.log
 .env
+gql.mjs
+tmp/

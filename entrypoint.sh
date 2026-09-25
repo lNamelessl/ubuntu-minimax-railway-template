@@ -71,6 +71,7 @@ if [ -n "${MCODE_PROVIDER_API_KEY:-}" ]; then
         log "mcode provider '${MCODE_PROVIDER_NAME}' already configured — skipping"
     else
         log "configuring mcode provider '${MCODE_PROVIDER_NAME}' -> ${MCODE_BASE_URL} (${MCODE_MODEL})"
+        # Preferred: test the key live, then save + select.
         if runuser -u dev -- /usr/bin/env HOME=/home/dev \
             /usr/bin/mcode provider add \
                 --name "$MCODE_PROVIDER_NAME" \
@@ -79,10 +80,26 @@ if [ -n "${MCODE_PROVIDER_API_KEY:-}" ]; then
                 --model "$MCODE_MODEL" \
                 --api-key-env MCODE_PROVIDER_API_KEY \
                 --use; then
-            log "provider configured and set active"
+            log "provider configured and set active (connection test passed)"
         else
-            log "WARN: mcode provider add failed (exit $?) — agent still installed;"
-            log "      run it manually after SSH: mcode provider add --help"
+            # Key present but the live test failed (placeholder/rotated key).
+            # Save the config unvalidated and select it — it will start working
+            # as soon as a valid key is supplied via the env variable.
+            log "connection test failed — saving provider config unvalidated and selecting it"
+            if runuser -u dev -- /usr/bin/env HOME=/home/dev \
+                /usr/bin/mcode provider add \
+                    --name "$MCODE_PROVIDER_NAME" \
+                    --base-url "$MCODE_BASE_URL" \
+                    --api-format anthropic-messages \
+                    --model "$MCODE_MODEL" \
+                    --api-key-env MCODE_PROVIDER_API_KEY \
+                && runuser -u dev -- /usr/bin/env HOME=/home/dev \
+                /usr/bin/mcode provider use "$MCODE_PROVIDER_NAME"; then
+                log "provider saved and set active (untested — check the API key)"
+            else
+                log "WARN: mcode provider add failed (exit $?) — agent still installed;"
+                log "      run it manually after SSH: mcode provider add --help"
+            fi
         fi
     fi
 else
